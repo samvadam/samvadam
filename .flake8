@@ -1,0 +1,4 @@
+# .flake8
+[flake8]
+ignore =  E501,E121,E999,E111,E113,F401,E126,E122,E123,E128,W291,E704
+max-line-length = 200
