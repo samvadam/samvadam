@@ -242,7 +242,11 @@ class TwilioTelephony:
                         agent_id=agent_id,
                         ultravox_config=UltravoxConfig(
                             medium={
-                                "twilio": {}
+                                "serverWebSocket": {
+                                "inputSampleRate": 8000,
+                                "outputSampleRate": 8000,
+                                "clientBufferSizeMs": 30000
+                            }
                             },
                             first_speaker_settings={
                                 "agent": {

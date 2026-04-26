@@ -41,7 +41,7 @@ class UltravoxVoiceEngine(BaseVoiceEngine):
             if agent_config.agent_id is None:
                 raise Exception("Agent ID is not set")
             agent_id = agent_config.agent_id
-            signed_url = await self._get_signed_url_for_agent(agent_id)
+            signed_url = await self._get_signed_url_for_agent(agent_id, config)
             if signed_url is None:
                 raise Exception("Failed to get signed url for agent")
             self._ws = await websockets.connect(signed_url)
@@ -50,26 +50,43 @@ class UltravoxVoiceEngine(BaseVoiceEngine):
             logger.error({"message": "Failed to connect to Ultravox voice engine", "error": str(e)})
             raise e
 
-    async def _get_signed_url_for_agent(self, agent_id: str) -> str | None:
+    async def _get_signed_url_for_agent(self, agent_id: str, config: SessionConfig) -> str | None:
         try:
             url = f"api/agents/{agent_id}/calls"
-            body: dict = {
-                "templateContext": {},
-                "metadata": {},
-                "medium": {
-                    "serverWebSocket": {
-                        "inputSampleRate": 8000,
-                        "outputSampleRate": 8000,
-                        "clientBufferSizeMs": 30000
-                    }
-                },
-                "recordingEnabled": True,
-                "firstSpeakerSettings": {
-                    "agent": {
-                        "text": "Hi! This is Raj from Even HealthCare. How's your day going?"
-                    }
-                }
-            }
+            body: dict = {}
+
+            if config.agent is not None:
+                if config.agent.ultravox_config is not None:
+                    if config.agent.ultravox_config.template_config is not None:
+                        body["templateContext"] = config.agent.ultravox_config.template_config
+                    else:
+                        body["templateContext"] = {}
+                    if config.agent.ultravox_config.metadata is not None:
+                        body["metadata"] = config.agent.ultravox_config.metadata
+                    else:
+                        body["metadata"] = {}
+                    if config.agent.ultravox_config.medium is not None:
+                        body["medium"] = config.agent.ultravox_config.medium
+                    else:
+                        body["medium"] = {
+                            "serverWebSocket": {
+                                "inputSampleRate": 8000,
+                                "outputSampleRate": 8000,
+                                "clientBufferSizeMs": 30000
+                            }
+                        }
+                    if config.agent.ultravox_config.recording_enabled is not None:
+                        body["recordingEnabled"] = config.agent.ultravox_config.recording_enabled
+                    else:
+                        body["recordingEnabled"] = True
+                    if config.agent.ultravox_config.first_speaker_settings is not None:
+                        body["firstSpeakerSettings"] = config.agent.ultravox_config.first_speaker_settings
+                    else:
+                        body["firstSpeakerSettings"] = {
+                            "agent": {
+                                "text": "Hi! How can I help you?"
+                            }
+                        }
             headers: dict = {
                 "Content-Type": "application/json",
                 "X-API-KEY": f"{self.api_key}"
