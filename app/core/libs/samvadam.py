@@ -12,3 +12,15 @@ class SamvadamLibs:
     @staticmethod
     def get_twilio_webhook_url() -> str:
         return f"{Env.SAMVADAM_PUBLIC_URL}/api/v1/twilio/webhook"
+
+    @staticmethod
+    def get_telnyx_webhook_url() -> str:
+        return f"{Env.SAMVADAM_PUBLIC_URL}/api/v1/telnyx/webhook"
+
+    @staticmethod
+    def get_telnyx_media_stream_url() -> str:
+        return f"{Env.SAMVADAM_PUBLIC_URL}/api/v1/telnyx/media-stream"
+
+    @staticmethod
+    def get_vonage_media_stream_url() -> str:
+        return f"{Env.SAMVADAM_PUBLIC_URL}/api/v1/vonage/media-stream"

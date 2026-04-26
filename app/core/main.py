@@ -15,6 +15,8 @@ import asyncio
 
 # Routes
 from .routes.twilio_route import router as twilio_router
+from .routes.telnyx_route import router as telnyx_router
+from .routes.vonage_route import router as vonage_router
 
 
 @asynccontextmanager
@@ -67,6 +69,8 @@ async def custom_swagger_ui_html(credentials: HTTPBasicCredentials = Depends(aut
 
 # Routes
 app.include_router(twilio_router, prefix="/api/v1/twilio")
+app.include_router(telnyx_router, prefix="/api/v1/telnyx")
+app.include_router(vonage_router, prefix="/api/v1/vonage")
 
 
 @app.get("/")

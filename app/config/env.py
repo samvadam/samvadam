@@ -27,3 +27,10 @@ class Env:
 
     # Ultravox
     ULTRAVOX_API_KEY: str | None = os.getenv("ULTRAVOX_API_KEY") or None
+
+    # Telnyx
+    TELNYX_API_KEY: str | None = os.getenv("TELNYX_API_KEY") or None
+
+    # Vonage
+    VONAGE_APPLICATION_ID: str | None = os.getenv("VONAGE_APPLICATION_ID") or None
+    VONAGE_PRIVATE_KEY_FILE_APTH: str | None = os.getenv("VONAGE_PRIVATE_KEY_FILE_APTH") or None
