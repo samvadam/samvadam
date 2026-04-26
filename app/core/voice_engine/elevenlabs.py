@@ -45,17 +45,18 @@ class ElevenLabsVoiceEngine(BaseVoiceEngine):
             # Build initiation payload
             override: dict = {}
             if config.agent:
-                agent_block: dict = {}
-                if config.agent.prompt:
-                    agent_block["prompt"] = {"prompt": config.agent.prompt}
-                if config.agent.first_message:
-                    agent_block["first_message"] = config.agent.first_message
-                if config.agent.language:
-                    agent_block["language"] = config.agent.language
-                if agent_block:
-                    override["agent"] = agent_block
-                if config.agent.voice_id:
-                    override["tts"] = {"voice_id": config.agent.voice_id}
+                if config.agent.elevenlabs_config:
+                    agent_block: dict = {}
+                    if config.agent.elevenlabs_config.prompt:
+                        agent_block["prompt"] = {"prompt": config.agent.elevenlabs_config.prompt}
+                    if config.agent.elevenlabs_config.first_message:
+                        agent_block["first_message"] = config.agent.elevenlabs_config.first_message
+                    if config.agent.elevenlabs_config.language:
+                        agent_block["language"] = config.agent.elevenlabs_config.language
+                    if agent_block:
+                        override["agent"] = agent_block
+                    if config.agent.elevenlabs_config.voice_id:
+                        override["tts"] = {"voice_id": config.agent.elevenlabs_config.voice_id}
 
             payload: dict = {"type": "conversation_initiation_client_data"}
             if override:

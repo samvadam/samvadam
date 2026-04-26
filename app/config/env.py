@@ -24,3 +24,6 @@ class Env:
     # Twilio
     TWILIO_ACCOUNT_SID: str | None = os.getenv("TWILIO_ACCOUNT_SID") or None
     TWILIO_AUTH_TOKEN: str | None = os.getenv("TWILIO_AUTH_TOKEN") or None
+
+    # Ultravox
+    ULTRAVOX_API_KEY: str | None = os.getenv("ULTRAVOX_API_KEY") or None

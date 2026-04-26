@@ -7,7 +7,7 @@ from fastapi import WebSocket, Response
 from app.utils.logger import logger
 from app.config.env import Env
 from ..libs.samvadam import SamvadamLibs
-
+from ..schemas.unified import VoiceEngine
 import asyncio
 
 
@@ -36,12 +36,16 @@ class TwilioService:
             trunk_url = SamvadamLibs.get_public_url().replace("https://", "").replace("http://", "")
             ws_url = f"wss://{trunk_url}/api/v1/twilio/media-stream"
             print("ws_url", ws_url)
+            voice_engine = VoiceEngine.ULTRAVOX.value
+            agent_id = "6df9bf14-86db-4b4f-a88d-937b45d153c1"
+            # voice_engine = VoiceEngine.ELEVENLABS.value
+            # agent_id = "agent_5701kjdhahcgf3wr1g7q7p7v4608"
             twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
                 <Response>
                     <Connect>
                         <Stream url="{ws_url}">
-                            <Parameter name="provider" value="elevenlabs" />
-                            <Parameter name="agent_id" value="agent_i12345" />
+                            <Parameter name="voice_engine" value="{voice_engine}" />
+                            <Parameter name="agent_id" value="{agent_id}" />
                         </Stream>
                     </Connect>
                 </Response>"""

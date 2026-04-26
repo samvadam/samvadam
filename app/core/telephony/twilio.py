@@ -8,8 +8,9 @@ import base64
 import audioop
 from ..voice_engine.libs import VoiceEngineLibs
 from typing import Optional
-from ..schemas.unified import SessionConfig, AgentConfig, MessageType, AudioChunk, AudioResponse, SessionReady
+from ..schemas.unified import SessionConfig, AgentConfig, MessageType, AudioChunk, AudioResponse, SessionReady, VoiceEngine, ElevenlabsConfig, UltravoxConfig
 from ..voice_engine.elevenlabs import ElevenLabsVoiceEngine
+from ..voice_engine.ultravox import UltravoxVoiceEngine
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException, TwilioServiceException
 from ..schemas.twilio import TwilioCallSchema
@@ -80,6 +81,10 @@ class TwilioTelephony:
             ratecv_state_holder: list[Optional[tuple]] = [None]
             voice_engine_audio_format: Optional[str] = None
 
+            # Custom Parameter from twilio
+            voice_engine: Optional[str] = None
+            agent_id: Optional[str] = None
+
             async def _send_audio_to_twilio(mulaw_chunk: str):
                 """Send PCM16 audio from voice engine back to Twilio as mulaw."""
 
@@ -98,8 +103,8 @@ class TwilioTelephony:
                     async for msg in await voice_engine_instance.receive():
                         nonlocal voice_engine_audio_format
 
-                        type = msg.type
-                        print("type", type)
+                        # type = msg.type
+                        # print("type", type)
 
                         if msg.type == MessageType.SESSION_READY:
                             if isinstance(msg, SessionReady):
@@ -130,16 +135,26 @@ class TwilioTelephony:
                             custom_params = start.get("customParameters", {})
                             logger.info({"message": "Twilio Stream started", "call_sid": call_sid, "custom_params": custom_params})
 
-                            # Todo : Logic for choosing voice engine
-                            voice_engine_instance = ElevenLabsVoiceEngine()
+                            agent_id = custom_params.get("agent_id")
+                            voice_engine = custom_params.get("voice_engine")
 
-                            config = SessionConfig(
-                                agent=AgentConfig(
-                                    agent_id="agent_5701kjdhahcgf3wr1g7q7p7v4608"
-                                ),
-                                # Pass call SID for traceability
-                                extra={"call_sid": call_sid, **custom_params},
-                            )
+                            if agent_id is None:
+                                logger.error({"message": "Agent ID is not set"})
+                                raise Exception("Agent ID is not set")
+                            if voice_engine is None:
+                                logger.error({"message": "Voice engine is not set"})
+                                raise Exception("Voice engine is not set")
+
+                            voice_engine_instance = await self._get_voice_engine_instance(voice_engine, agent_id)
+
+                            if voice_engine_instance is None:
+                                logger.error({"message": "Voice engine instance is not set"})
+                                raise Exception("Voice engine instance is not set")
+
+                            config = await self._get_voice_engine_config(voice_engine, agent_id, custom_params)
+                            if config is None:
+                                logger.error({"message": "Failed to get voice engine config"})
+                                raise Exception("Failed to get voice engine config")
 
                             await voice_engine_instance.connect(config)
                             logger.info({"message": "Voice engine connected"})
@@ -150,26 +165,31 @@ class TwilioTelephony:
                         case "media":
                             if not voice_engine_instance:
                                 continue
-                            # mulaw_b64 = data["media"]["payload"]
 
-                            # # Convert to the format the provider expects
-                            # if audio_rate == 16000:
-                            #     pcm_b64 = mulaw_to_pcm16_16k_base64(mulaw_b64)
-                            # else:
-                            #     pcm_b64 = mulaw_to_pcm16_base64(mulaw_b64)
+                            # ElevenLabs
+                            if voice_engine == VoiceEngine.ELEVENLABS:
+                                mulaw_b64 = data["media"]["payload"]
+                                mulaw_bytes = base64.b64decode(mulaw_b64)
 
-                            mulaw_b64 = data["media"]["payload"]
-                            mulaw_bytes = base64.b64decode(mulaw_b64)
+                                # mulaw -> linear PCM (8kHz, 16-bit)
+                                pcm_8k = audioop.ulaw2lin(mulaw_bytes, 2)
 
-                            # mulaw -> linear PCM (8kHz, 16-bit)
-                            pcm_8k = audioop.ulaw2lin(mulaw_bytes, 2)
+                                # 8kHz -> 16kHz with stateful resampling to avoid clicks/pops
+                                pcm_16k, ratecv_state_holder[0] = audioop.ratecv(
+                                    pcm_8k, 2, 1, 8000, 16000, ratecv_state_holder[0]
+                                )
+                                pcm_b64 = base64.b64encode(pcm_16k).decode("utf-8")
+                                await voice_engine_instance.send(AudioChunk(audio=pcm_b64))
 
-                            # 8kHz -> 16kHz with stateful resampling to avoid clicks/pops
-                            pcm_16k, ratecv_state_holder[0] = audioop.ratecv(
-                                pcm_8k, 2, 1, 8000, 16000, ratecv_state_holder[0]
-                            )
-                            pcm_b64 = base64.b64encode(pcm_16k).decode("utf-8")
-                            await voice_engine_instance.send(AudioChunk(audio=pcm_b64))
+                            elif voice_engine == VoiceEngine.ULTRAVOX:
+                                mulaw_b64 = data["media"]["payload"]
+                                mulaw_bytes = base64.b64decode(mulaw_b64)
+
+                                # mulaw → linear PCM 16-bit at 8kHz
+                                pcm_8k = audioop.ulaw2lin(mulaw_bytes, 2)
+                                pcm_b64 = base64.b64encode(pcm_8k).decode("utf-8")
+
+                                await voice_engine_instance.send(AudioChunk(audio=pcm_b64))
 
                         case "stop":
                             logger.info({"message": "Twilio Stream stopped"})
@@ -188,4 +208,58 @@ class TwilioTelephony:
                 logger.info({"message": "Twilio WebSocket Ended"})
         except Exception as e:
             logger.error({"message": "Twilio WebSocket error", "error": str(e)})
+            raise e
+
+    async def _get_voice_engine_instance(self, voice_engine: str, agent_id: str) -> BaseVoiceEngine | None:
+        try:
+            if voice_engine == VoiceEngine.ELEVENLABS:
+                return ElevenLabsVoiceEngine()
+            elif voice_engine == VoiceEngine.ULTRAVOX:
+                return UltravoxVoiceEngine()
+            # elif voice_engine == VoiceEngine.OPENAI:
+            #     return 
+            #     return ElevenLabsVoiceEngine()
+            else:
+                raise Exception("Unknown voice engine")
+        except Exception as e:
+            logger.error({"message": "Failed to get voice engine instance", "error": str(e)})
+            raise e
+
+    async def _get_voice_engine_config(self, voice_engine: str, agent_id: str, extra: dict) -> SessionConfig | None:
+        try:
+            if voice_engine == VoiceEngine.ELEVENLABS:
+                config = SessionConfig(
+                    agent=AgentConfig(
+                        agent_id=agent_id,
+                        elevenlabs_config=ElevenlabsConfig()
+                    ),
+                    extra=extra
+                )
+                return config
+            elif voice_engine == VoiceEngine.ULTRAVOX:
+                config = SessionConfig(
+                    agent=AgentConfig(
+                        agent_id=agent_id,
+                        ultravox_config=UltravoxConfig(
+                            medium={
+                                "twilio": {}
+                            },
+                            first_speaker_settings={
+                                "agent": {
+                                    "text": "Hi! This is Raj from Even HealthCare. How's your day going?"
+                                }
+                            },
+                            recording_enabled=True,
+                            metadata={},
+                            template_config={}
+                        )
+                    )
+                )
+                return config
+            elif voice_engine == VoiceEngine.OPENAI:
+                pass
+            else:
+                raise Exception("Unknown voice engine")
+        except Exception as e:
+            logger.error({"message": "Failed to get voice engine config", "error": str(e)})
             raise e

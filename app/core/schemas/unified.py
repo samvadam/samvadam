@@ -65,12 +65,27 @@ class UnifiedMessage(BaseModel):
 
 # Samvadam → Voice-Engine messages
 
-class AgentConfig(BaseModel):
-    agent_id: str
+class UltravoxConfig(BaseModel):
+    template_config: Optional[dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
+    medium: Optional[dict[str, Any]] = None
+    recording_enabled: Optional[bool] = True
+    first_speaker_settings: Optional[dict[str, Any]] = None
+    model: Optional[str] = "ultravox-v0.7"
+    voice: Optional[str] = "Mark"
+
+
+class ElevenlabsConfig(BaseModel):
     prompt: Optional[str] = None
     first_message: Optional[str] = None
     language: Optional[str] = None
     voice_id: Optional[str] = None
+
+
+class AgentConfig(BaseModel):
+    agent_id: str
+    elevenlabs_config: Optional[ElevenlabsConfig] = None
+    ultravox_config: Optional[UltravoxConfig] = None
 
 
 class SessionConfig(BaseModel):
